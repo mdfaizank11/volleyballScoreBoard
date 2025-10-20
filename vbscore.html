@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volleyball Scoreboard</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent; /* remove highlight on tap */
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .team {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            color: white;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .teamA { background-color: #c62828; } /* Red */
+        .teamB { background-color: #1565c0; } /* Blue */
+
+        .score {
+            font-size: 90vh; /* almost full vertical height */
+            font-weight: 900;
+            line-height: 1;
+            text-align: center;
+        }
+
+        .buttons {
+            position: absolute;
+            bottom: 5vh;
+            display: flex;
+            gap: 3vw;
+        }
+
+        .buttons button {
+            font-size: 6vh;
+            padding: 3vh 4vw;
+            background-color: #333;
+            border: none;
+            border-radius: 1vw;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .buttons button:hover,
+        .buttons button:active {
+            background-color: #555;
+            transform: translateY(2px); /* pressed effect */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .reset-container {
+            position: absolute;
+            bottom: 2vh;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .reset-container button {
+            font-size: 4vh;
+            padding: 1.5vh 4vw;
+            background-color: #ff9800;
+            color: white;
+            border: none;
+            border-radius: 1vw;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .reset-container button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        @media (orientation: landscape) {
+            .score { font-size: 85vh; }
+            .buttons button { font-size: 5vh; padding: 2.5vh 4vw; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="team teamA" onclick="add('A')">
+        <div class="score" id="scoreA">0</div>
+        <div class="buttons">
+            <button onclick="event.stopPropagation(); add('A')">+1</button>
+            <button onclick="event.stopPropagation(); subtract('A')">-1</button>
+        </div>
+    </div>
+
+    <div class="team teamB" onclick="add('B')">
+        <div class="score" id="scoreB">0</div>
+        <div class="buttons">
+            <button onclick="event.stopPropagation(); add('B')">+1</button>
+            <button onclick="event.stopPropagation(); subtract('B')">-1</button>
+        </div>
+    </div>
+</div>
+
+<div class="reset-container">
+    <button onclick="resetScores()">Reset</button>
+</div>
+
+<script>
+    let scoreA = 0;
+    let scoreB = 0;
+
+    function updateDisplay() {
+        document.getElementById('scoreA').innerText = scoreA;
+        document.getElementById('scoreB').innerText = scoreB;
+    }
+
+    function add(team) {
+        if(team === 'A') scoreA++;
+        else scoreB++;
+        updateDisplay();
+    }
+
+    function subtract(team) {
+        if(team === 'A' && scoreA>0) scoreA--;
+        else if(team === 'B' && scoreB>0) scoreB--;
+        updateDisplay();
+    }
+
+    function resetScores() {
+        if(confirm('Reset both scores?')) {
+            scoreA = 0;
+            scoreB = 0;
+            updateDisplay();
+        }
+    }
+
+    updateDisplay();
+</script>
+
+</body>
+</html>
