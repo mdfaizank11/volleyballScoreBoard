@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Volleyball Scoreboard</title>
     <style>
         html, body {
@@ -11,7 +11,7 @@
             height: 100%;
             overflow: hidden;
             font-family: Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent; /* remove highlight on tap */
+            background-color: black;
         }
 
         .container {
@@ -29,44 +29,45 @@
             position: relative;
             color: white;
             user-select: none;
-            touch-action: manipulation;
+            overflow: hidden;
         }
 
         .teamA { background-color: #c62828; } /* Red */
         .teamB { background-color: #1565c0; } /* Blue */
 
         .score {
-            font-size: 90vh; /* almost full vertical height */
             font-weight: 900;
             line-height: 1;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            transition: transform 0.4s ease;
         }
 
         .buttons {
             position: absolute;
-            bottom: 5vh;
+            bottom: 2vh;
             display: flex;
-            gap: 3vw;
+            gap: 2vw;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .buttons button {
-            font-size: 6vh;
-            padding: 3vh 4vw;
-            background-color: #333;
+            font-size: 5vh;
+            padding: 3vh 5vw;
+            background-color: rgba(255, 255, 255, 0.25);
             border: none;
             border-radius: 1vw;
             color: white;
             cursor: pointer;
-            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
-            transition: all 0.2s ease;
-            -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.2s ease;
+            touch-action: manipulation;
         }
 
-        .buttons button:hover,
-        .buttons button:active {
-            background-color: #555;
-            transform: translateY(2px); /* pressed effect */
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        .buttons button:hover {
+            background-color: rgba(255, 255, 255, 0.4);
         }
 
         .reset-container {
@@ -77,33 +78,23 @@
         }
 
         .reset-container button {
-            font-size: 4vh;
-            padding: 1.5vh 4vw;
+            font-size: 3vh;
+            padding: 1vh 3vw;
             background-color: #ff9800;
             color: white;
             border: none;
             border-radius: 1vw;
-            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
-            cursor: pointer;
-            transition: all 0.2s ease;
         }
 
-        .reset-container button:active {
-            transform: translateY(2px);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-        }
-
-        @media (orientation: landscape) {
-            .score { font-size: 85vh; }
-            .buttons button { font-size: 5vh; padding: 2.5vh 4vw; }
+        .glow {
+            text-shadow: 0 0 40px rgba(255, 255, 255, 0.7);
         }
     </style>
 </head>
 <body>
-
 <div class="container">
     <div class="team teamA" onclick="add('A')">
-        <div class="score" id="scoreA">0</div>
+        <div id="scoreA" class="score glow">0</div>
         <div class="buttons">
             <button onclick="event.stopPropagation(); add('A')">+1</button>
             <button onclick="event.stopPropagation(); subtract('A')">-1</button>
@@ -111,7 +102,7 @@
     </div>
 
     <div class="team teamB" onclick="add('B')">
-        <div class="score" id="scoreB">0</div>
+        <div id="scoreB" class="score glow">0</div>
         <div class="buttons">
             <button onclick="event.stopPropagation(); add('B')">+1</button>
             <button onclick="event.stopPropagation(); subtract('B')">-1</button>
@@ -127,33 +118,59 @@
     let scoreA = 0;
     let scoreB = 0;
 
-    function updateDisplay() {
-        document.getElementById('scoreA').innerText = scoreA;
-        document.getElementById('scoreB').innerText = scoreB;
+    function updateDisplay(team, direction) {
+        const el = document.getElementById('score' + team);
+        el.style.transition = 'none';
+        el.style.transform = direction === 'up' ? 'translateY(100%)' : 'translateY(-100%)';
+
+        requestAnimationFrame(() => {
+            el.innerText = team === 'A' ? scoreA : scoreB;
+            adjustFontSize(el);
+            el.style.transition = 'transform 0.4s ease';
+            el.style.transform = 'translateY(0)';
+        });
     }
 
     function add(team) {
-        if(team === 'A') scoreA++;
+        if (team === 'A') scoreA++;
         else scoreB++;
-        updateDisplay();
+        updateDisplay(team, 'up');
     }
 
     function subtract(team) {
-        if(team === 'A' && scoreA>0) scoreA--;
-        else if(team === 'B' && scoreB>0) scoreB--;
-        updateDisplay();
+        if (team === 'A' && scoreA > 0) scoreA--;
+        else if (team === 'B' && scoreB > 0) scoreB--;
+        updateDisplay(team, 'down');
     }
 
     function resetScores() {
-        if(confirm('Reset both scores?')) {
+        if (confirm('Reset both scores?')) {
             scoreA = 0;
             scoreB = 0;
-            updateDisplay();
+            document.getElementById('scoreA').innerText = '0';
+            document.getElementById('scoreB').innerText = '0';
+            adjustFontSize(document.getElementById('scoreA'));
+            adjustFontSize(document.getElementById('scoreB'));
         }
     }
 
-    updateDisplay();
-</script>
+    function adjustFontSize(el) {
+        const parent = el.parentElement;
+        let fontSize = window.innerHeight * 0.8;
+        el.style.fontSize = fontSize + 'px';
+        while (el.scrollWidth > parent.clientWidth - 40) {
+            fontSize -= 5;
+            el.style.fontSize = fontSize + 'px';
+        }
+    }
 
+    window.addEventListener('resize', () => {
+        adjustFontSize(document.getElementById('scoreA'));
+        adjustFontSize(document.getElementById('scoreB'));
+    });
+
+    adjustFontSize(document.getElementById('scoreA'));
+    adjustFontSize(document.getElementById('scoreB'));
+</script>
 </body>
 </html>
