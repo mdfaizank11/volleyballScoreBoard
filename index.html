@@ -1,53 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Volleyball Scoreboard</title>
-    <style>
-        html, body { margin:0; padding:0; height:100%; font-family:Arial,sans-serif; background:black; color:white; }
-        .container { display:flex; height:100vh; }
-        .team { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; position:relative; }
-        .teamA { background:#c62828; }
-        .teamB { background:#1565c0; }
-        .score { font-size:45vh; font-weight:900; text-align:center; user-select:none; }
-        .buttons { position:absolute; bottom:5%; display:flex; gap:2vw; }
-        .buttons button { font-size:5vh; padding:2vh 3vw; border:none; border-radius:1vw; color:white; background:rgba(255,255,255,0.25); cursor:pointer; }
-        .buttons button:hover { background:rgba(255,255,255,0.5); }
-        .reset-container { position:absolute; bottom:2%; left:50%; transform:translateX(-50%); }
-        .reset-container button { font-size:3vh; padding:1vh 3vw; background:#ff9800; color:white; border:none; border-radius:1vw; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Volleyball Scoreboard</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; font-family:Arial,sans-serif; background:black; color:white; overflow:hidden; }
+  .container { display:flex; height:100vh; position:relative; }
+  .team { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; position:relative; }
+  .teamA { background:#c62828; }
+  .teamB { background:#1565c0; }
+  .score { font-size:45vh; font-weight:900; text-align:center; user-select:none; }
+
+  /* --- Buttons at top --- */
+  .buttons-top {
+    position:absolute;
+    top:1vh;  /* distance from top */
+    width:100%;
+    display:flex;
+    justify-content:space-around;
+    gap:2vw;
+    z-index:10;
+  }
+  .buttons-top button {
+    font-size:4vh;
+    padding:1vh 2vw;
+    border:none;
+    border-radius:1vw;
+    color:white;
+    background:rgba(255,255,255,0.25);
+    cursor:pointer;
+  }
+  .buttons-top button:hover { background:rgba(255,255,255,0.5); }
+
+  .reset-container { position:absolute; bottom:2%; left:50%; transform:translateX(-50%); }
+  .reset-container button { font-size:3vh; padding:1vh 3vw; background:#ff9800; color:white; border:none; border-radius:1vw; }
+</style>
 </head>
 <body>
 
+<!-- Buttons at top -->
+<div class="buttons-top">
+  <button id="addA">A +1</button>
+  <button id="subA">A -1</button>
+  <button id="addB">B +1</button>
+  <button id="subB">B -1</button>
+</div>
+
 <div class="container">
-    <div class="team teamA">
-        <div id="scoreA" class="score">0</div>
-        <div class="buttons">
-            <button id="addA">+1</button>
-            <button id="subA">-1</button>
-        </div>
-    </div>
-    <div class="team teamB">
-        <div id="scoreB" class="score">0</div>
-        <div class="buttons">
-            <button id="addB">+1</button>
-            <button id="subB">-1</button>
-        </div>
-    </div>
+  <div class="team teamA">
+      <div id="scoreA" class="score">0</div>
+  </div>
+  <div class="team teamB">
+      <div id="scoreB" class="score">0</div>
+  </div>
 </div>
 
 <div class="reset-container">
-    <button id="reset">Reset</button>
+  <button id="reset">Reset</button>
 </div>
 
-<!-- ESM Module Script -->
 <script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-   const supabaseUrl = 'https://ygwqbzdhlpvhpuueyyov.supabase.co';
-   const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3FiemRobHB2aHB1dWV5eW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzOTQ2NDUsImV4cCI6MjA3Njk3MDY0NX0._N7Pe1ugrzj83SNl4hUlqqIYQeN5Xed2G9SWftVw8-s';
-   const supabase = createClient(supabaseUrl, supabaseKey);
+  // --- Supabase config ---
+  const supabaseUrl = 'https://ygwqbzdhlpvhpuueyyov.supabase.co';
+  const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
   const gameId = 'volleyball-game-1';
   let scoreA = 0, scoreB = 0;
@@ -55,6 +74,7 @@
   const elA = document.getElementById('scoreA');
   const elB = document.getElementById('scoreB');
 
+  // --- Update display ---
   function updateDisplay() {
     elA.innerText = scoreA;
     elB.innerText = scoreB;
@@ -63,10 +83,7 @@
   // --- Fetch initial scores ---
   async function getScores() {
     const { data, error } = await supabase.from('games').select('*').eq('id', gameId).single();
-    if (error) {
-      console.error('Error fetching scores:', error);
-      return;
-    }
+    if (error) { console.error('Error fetching scores:', error); return; }
     if (data) {
       scoreA = data.scorea;
       scoreB = data.scoreb;
@@ -76,33 +93,23 @@
 
   // --- Update scores in Supabase ---
   async function setScores() {
-    const { error } = await supabase
-      .from('games')
-      .update({ scorea: scoreA, scoreb: scoreB })
-      .eq('id', gameId);
+    const { error } = await supabase.from('games').update({ scorea: scoreA, scoreb: scoreB }).eq('id', gameId);
     if (error) console.error('Error updating scores:', error);
   }
 
-  // --- Subscribe to realtime changes ---
-  supabase
-    .channel('public:games')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` },
-      (payload) => {
-        console.log('Realtime change received:', payload);
-        const newData = payload.new;
-        scoreA = newData.scorea;
-        scoreB = newData.scoreb;
-        updateDisplay();
-      }
-    )
+  // --- Realtime subscription ---
+  supabase.channel('public:games')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, (payload) => {
+      const newData = payload.new;
+      scoreA = newData.scorea;
+      scoreB = newData.scoreb;
+      updateDisplay();
+    })
     .subscribe();
 
   // --- Button actions ---
   const add = async (team) => {
-    if (team === 'A') scoreA++;
-    else scoreB++;
+    if (team === 'A') scoreA++; else scoreB++;
     updateDisplay();
     await setScores();
   };
@@ -133,7 +140,5 @@
   // --- Initial load ---
   await getScores();
 </script>
-
-
 </body>
 </html>
