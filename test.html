@@ -72,13 +72,13 @@
             scoreA = data.scorea;
             scoreB = data.scoreb;
         } else {
-            await supabase.from('games').insert([{ id: gameId, scoreA: 0, scoreB: 0 }]);
+            await supabase.from('games').insert([{ id: gameId, scorea: 0, scoreb: 0 }]);
         }
         updateDisplay();
     }
 
     async function setScores() {
-        const { error } = await supabase.from('games').update({ scoreA, scoreB }).eq('id', gameId);
+        const { error } = await supabase.from('games').update({ scorea: scoreA, scoreb: scoreB }).eq('id', gameId);
         if (error) console.error('Error updating scores:', error);
     }
 
