@@ -1,176 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Volleyball Scoreboard</title>
     <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-            background-color: black;
-        }
-
-        .container {
-            display: flex;
-            height: 100vh;
-            width: 100vw;
-        }
-
-        .team {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            color: white;
-            user-select: none;
-            overflow: hidden;
-        }
-
-        .teamA { background-color: #c62828; } /* Red */
-        .teamB { background-color: #1565c0; } /* Blue */
-
-        .score {
-            font-weight: 900;
-            line-height: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            white-space: nowrap;
-            transition: transform 0.4s ease;
-        }
-
-        .buttons {
-            position: absolute;
-            bottom: 2vh;
-            display: flex;
-            gap: 2vw;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .buttons button {
-            font-size: 5vh;
-            padding: 3vh 5vw;
-            background-color: rgba(255, 255, 255, 0.25);
-            border: none;
-            border-radius: 1vw;
-            color: white;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-            touch-action: manipulation;
-        }
-
-        .buttons button:hover {
-            background-color: rgba(255, 255, 255, 0.4);
-        }
-
-        .reset-container {
-            position: absolute;
-            bottom: 2vh;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-
-        .reset-container button {
-            font-size: 3vh;
-            padding: 1vh 3vw;
-            background-color: #ff9800;
-            color: white;
-            border: none;
-            border-radius: 1vw;
-        }
-
-        .glow {
-            text-shadow: 0 0 40px rgba(255, 255, 255, 0.7);
-        }
+        html, body { margin:0; padding:0; height:100%; font-family:Arial,sans-serif; background:black; color:white; }
+        .container { display:flex; height:100vh; }
+        .team { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; position:relative; }
+        .teamA { background:#c62828; }
+        .teamB { background:#1565c0; }
+        .score { font-size:45vh; font-weight:900; text-align:center; user-select:none; }
+        .buttons { position:absolute; bottom:5%; display:flex; gap:2vw; }
+        .buttons button { font-size:5vh; padding:2vh 3vw; border:none; border-radius:1vw; color:white; background:rgba(255,255,255,0.25); cursor:pointer; }
+        .buttons button:hover { background:rgba(255,255,255,0.5); }
+        .reset-container { position:absolute; bottom:2%; left:50%; transform:translateX(-50%); }
+        .reset-container button { font-size:3vh; padding:1vh 3vw; background:#ff9800; color:white; border:none; border-radius:1vw; }
     </style>
 </head>
 <body>
+
 <div class="container">
-    <div class="team teamA" onclick="add('A')">
-        <div id="scoreA" class="score glow">0</div>
+    <div class="team teamA">
+        <div id="scoreA" class="score">0</div>
         <div class="buttons">
-            <button onclick="event.stopPropagation(); add('A')">+1</button>
-            <button onclick="event.stopPropagation(); subtract('A')">-1</button>
+            <button id="addA">+1</button>
+            <button id="subA">-1</button>
         </div>
     </div>
-
-    <div class="team teamB" onclick="add('B')">
-        <div id="scoreB" class="score glow">0</div>
+    <div class="team teamB">
+        <div id="scoreB" class="score">0</div>
         <div class="buttons">
-            <button onclick="event.stopPropagation(); add('B')">+1</button>
-            <button onclick="event.stopPropagation(); subtract('B')">-1</button>
+            <button id="addB">+1</button>
+            <button id="subB">-1</button>
         </div>
     </div>
 </div>
 
 <div class="reset-container">
-    <button onclick="resetScores()">Reset</button>
+    <button id="reset">Reset</button>
 </div>
 
-<script>
-    let scoreA = 0;
-    let scoreB = 0;
+<!-- ESM Module Script -->
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
-    function updateDisplay(team, direction) {
-        const el = document.getElementById('score' + team);
-        el.style.transition = 'none';
-        el.style.transform = direction === 'up' ? 'translateY(100%)' : 'translateY(-100%)';
+   const supabaseUrl = 'https://ygwqbzdhlpvhpuueyyov.supabase.co';
+   const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3FiemRobHB2aHB1dWV5eW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzOTQ2NDUsImV4cCI6MjA3Njk3MDY0NX0._N7Pe1ugrzj83SNl4hUlqqIYQeN5Xed2G9SWftVw8-s';
+   const supabase = createClient(supabaseUrl, supabaseKey);
 
-        requestAnimationFrame(() => {
-            el.innerText = team === 'A' ? scoreA : scoreB;
-            adjustFontSize(el);
-            el.style.transition = 'transform 0.4s ease';
-            el.style.transform = 'translateY(0)';
-        });
+  const gameId = 'volleyball-game-1';
+  let scoreA = 0, scoreB = 0;
+
+  const elA = document.getElementById('scoreA');
+  const elB = document.getElementById('scoreB');
+
+  function updateDisplay() {
+    elA.innerText = scoreA;
+    elB.innerText = scoreB;
+  }
+
+  // --- Fetch initial scores ---
+  async function getScores() {
+    const { data, error } = await supabase.from('games').select('*').eq('id', gameId).single();
+    if (error) {
+      console.error('Error fetching scores:', error);
+      return;
     }
-
-    function add(team) {
-        if (team === 'A') scoreA++;
-        else scoreB++;
-        updateDisplay(team, 'up');
+    if (data) {
+      scoreA = data.scorea;
+      scoreB = data.scoreb;
+      updateDisplay();
     }
+  }
 
-    function subtract(team) {
-        if (team === 'A' && scoreA > 0) scoreA--;
-        else if (team === 'B' && scoreB > 0) scoreB--;
-        updateDisplay(team, 'down');
+  // --- Update scores in Supabase ---
+  async function setScores() {
+    const { error } = await supabase
+      .from('games')
+      .update({ scorea: scoreA, scoreb: scoreB })
+      .eq('id', gameId);
+    if (error) console.error('Error updating scores:', error);
+  }
+
+  // --- Subscribe to realtime changes ---
+  supabase
+    .channel('public:games')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` },
+      (payload) => {
+        console.log('Realtime change received:', payload);
+        const newData = payload.new;
+        scoreA = newData.scorea;
+        scoreB = newData.scoreb;
+        updateDisplay();
+      }
+    )
+    .subscribe();
+
+  // --- Button actions ---
+  const add = async (team) => {
+    if (team === 'A') scoreA++;
+    else scoreB++;
+    updateDisplay();
+    await setScores();
+  };
+
+  const subtract = async (team) => {
+    if (team === 'A' && scoreA > 0) scoreA--;
+    else if (team === 'B' && scoreB > 0) scoreB--;
+    updateDisplay();
+    await setScores();
+  };
+
+  const resetScores = async () => {
+    if (confirm('Reset both scores?')) {
+      scoreA = 0;
+      scoreB = 0;
+      updateDisplay();
+      await setScores();
     }
+  };
 
-    function resetScores() {
-        if (confirm('Reset both scores?')) {
-            scoreA = 0;
-            scoreB = 0;
-            document.getElementById('scoreA').innerText = '0';
-            document.getElementById('scoreB').innerText = '0';
-            adjustFontSize(document.getElementById('scoreA'));
-            adjustFontSize(document.getElementById('scoreB'));
-        }
-    }
+  // --- Attach event listeners ---
+  document.getElementById('addA').onclick = () => add('A');
+  document.getElementById('subA').onclick = () => subtract('A');
+  document.getElementById('addB').onclick = () => add('B');
+  document.getElementById('subB').onclick = () => subtract('B');
+  document.getElementById('reset').onclick = () => resetScores();
 
-    function adjustFontSize(el) {
-        const parent = el.parentElement;
-        let fontSize = window.innerHeight * 0.8;
-        el.style.fontSize = fontSize + 'px';
-        while (el.scrollWidth > parent.clientWidth - 40) {
-            fontSize -= 5;
-            el.style.fontSize = fontSize + 'px';
-        }
-    }
-
-    window.addEventListener('resize', () => {
-        adjustFontSize(document.getElementById('scoreA'));
-        adjustFontSize(document.getElementById('scoreB'));
-    });
-
-    adjustFontSize(document.getElementById('scoreA'));
-    adjustFontSize(document.getElementById('scoreB'));
+  // --- Initial load ---
+  await getScores();
 </script>
+
+
 </body>
 </html>
