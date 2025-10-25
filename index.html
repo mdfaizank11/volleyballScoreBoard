@@ -167,6 +167,16 @@
 
     // --- Initial load ---
     await getScores();
+
+    // --- Attach button listeners ---
+    document.getElementById('subA').onclick = (e) => {
+        e.stopPropagation();  // prevent container click
+        subtract('A');
+    };
+    document.getElementById('subB').onclick = (e) => {
+        e.stopPropagation();  // prevent container click
+        subtract('B');
+    };
 </script>
 
 </body>
