@@ -82,20 +82,16 @@
   }
 
   // --- Subscribe to realtime changes ---
-  supabase
-    .channel('public:games')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` },
-      (payload) => {
-        console.log('Realtime change received:', payload);
-        const newData = payload.new;
-        scoreA = newData.scorea;
-        scoreB = newData.scoreb;
-        updateDisplay();
-      }
-    )
-    .subscribe();
+ const channel = supabase.channel('public:games')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, payload => {
+    const newData = payload.new;
+    scoreA = newData.scorea;
+    scoreB = newData.scoreb;
+    updateDisplay();
+  })
+  .subscribe((status) => {
+    console.log('Realtime subscription status:', status);
+  });
 
   // --- Button actions ---
   const add = async (team) => {
