@@ -69,8 +69,8 @@
             return;
         }
         if (data) {
-            scoreA = data.scoreA;
-            scoreB = data.scoreB;
+            scoreA = data.scorea;
+            scoreB = data.scoreb;
         } else {
             await supabase.from('games').insert([{ id: gameId, scoreA: 0, scoreB: 0 }]);
         }
