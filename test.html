@@ -43,79 +43,97 @@
 
 <!-- ESM Module Script -->
 <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
-    // --- Initialize Supabase ---
-    const supabaseUrl = 'https://ygwqbzdhlpvhpuueyyov.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3FiemRobHB2aHB1dWV5eW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzOTQ2NDUsImV4cCI6MjA3Njk3MDY0NX0._N7Pe1ugrzj83SNl4hUlqqIYQeN5Xed2G9SWftVw8-s';
+  const supabaseUrl = 'https://ygwqbzdhlpvhpuueyyov.supabase.co';
+  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3FiemRobHB2aHB1dWV5eW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzOTQ2NDUsImV4cCI6MjA3Njk3MDY0NX0._N7Pe1ugrzj83SNl4hUlqqIYQeN5Xed2G9SWftVw8-s';
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+  const gameId = 'volleyball-game-1';
+  let scoreA = 0, scoreB = 0;
 
-    const gameId = 'volleyball-game-1';
-    let scoreA = 0, scoreB = 0;
+  const elA = document.getElementById('scoreA');
+  const elB = document.getElementById('scoreB');
 
-    const elA = document.getElementById('scoreA');
-    const elB = document.getElementById('scoreB');
+  function updateDisplay() {
+    elA.innerText = scoreA;
+    elB.innerText = scoreB;
+  }
 
-    function updateDisplay() {
-        elA.innerText = scoreA;
-        elB.innerText = scoreB;
+  // --- Fetch initial scores ---
+  async function getScores() {
+    const { data, error } = await supabase.from('games').select('*').eq('id', gameId).single();
+    if (error) {
+      console.error('Error fetching scores:', error);
+      return;
     }
+    if (data) {
+      scoreA = data.scorea;
+      scoreB = data.scoreb;
+      updateDisplay();
+    }
+  }
 
-    async function getScores() {
-        const { data, error } = await supabase.from('games').select('*').eq('id', gameId).single();
-        if (error) {
-            console.error('Error fetching scores:', error);
-            return;
-        }
-        if (data) {
-            scoreA = data.scorea;
-            scoreB = data.scoreb;
-        } else {
-            await supabase.from('games').insert([{ id: gameId, scorea: 0, scoreb: 0 }]);
-        }
+  // --- Update scores in Supabase ---
+  async function setScores() {
+    const { error } = await supabase
+      .from('games')
+      .update({ scorea: scoreA, scoreb: scoreB })
+      .eq('id', gameId);
+    if (error) console.error('Error updating scores:', error);
+  }
+
+  // --- Subscribe to realtime changes ---
+  supabase
+    .channel('public:games')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` },
+      (payload) => {
+        console.log('Realtime change received:', payload);
+        const newData = payload.new;
+        scoreA = newData.scorea;
+        scoreB = newData.scoreb;
         updateDisplay();
+      }
+    )
+    .subscribe();
+
+  // --- Button actions ---
+  const add = async (team) => {
+    if (team === 'A') scoreA++;
+    else scoreB++;
+    updateDisplay();
+    await setScores();
+  };
+
+  const subtract = async (team) => {
+    if (team === 'A' && scoreA > 0) scoreA--;
+    else if (team === 'B' && scoreB > 0) scoreB--;
+    updateDisplay();
+    await setScores();
+  };
+
+  const resetScores = async () => {
+    if (confirm('Reset both scores?')) {
+      scoreA = 0;
+      scoreB = 0;
+      updateDisplay();
+      await setScores();
     }
+  };
 
-    async function setScores() {
-        const { error } = await supabase.from('games').update({ scorea: scoreA, scoreb: scoreB }).eq('id', gameId);
-        if (error) console.error('Error updating scores:', error);
-    }
+  // --- Attach event listeners ---
+  document.getElementById('addA').onclick = () => add('A');
+  document.getElementById('subA').onclick = () => subtract('A');
+  document.getElementById('addB').onclick = () => add('B');
+  document.getElementById('subB').onclick = () => subtract('B');
+  document.getElementById('reset').onclick = () => resetScores();
 
-    const add = async (team) => {
-        if (team === 'A') scoreA++; else scoreB++;
-        updateDisplay();
-        await setScores();
-    }
-
-    const subtract = async (team) => {
-        if (team === 'A' && scoreA > 0) scoreA--;
-        else if (team === 'B' && scoreB > 0) scoreB--;
-        updateDisplay();
-        await setScores();
-    }
-
-    const resetScores = async () => {
-        if (confirm('Reset both scores?')) {
-            scoreA = 0; scoreB = 0;
-            updateDisplay();
-            await setScores();
-        }
-    }
-
-    // --- Attach button events ---
-    document.getElementById('addA').onclick = () => add('A');
-    document.getElementById('subA').onclick = () => subtract('A');
-    document.getElementById('addB').onclick = () => add('B');
-    document.getElementById('subB').onclick = () => subtract('B');
-    document.getElementById('reset').onclick = () => resetScores();
-
-    // --- Initialize ---
-    await getScores();
-
-    // --- Poll every 2 seconds ---
-    setInterval(getScores, 500);
+  // --- Initial load ---
+  await getScores();
 </script>
+
 
 </body>
 </html>
