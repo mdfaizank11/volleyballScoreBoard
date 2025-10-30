@@ -14,6 +14,11 @@
             display:flex;
             height:100vh;
             width:100vw;
+            transition: all 0.5s ease;
+        }
+
+        .container.flipped {
+            flex-direction: row-reverse;
         }
 
         .team {
@@ -46,8 +51,8 @@
         }
 
         .sub-button {
-            font-size:12vh;            /* bigger text */
-            padding:2vh 6vw;           /* more vertical and horizontal space */
+            font-size:12vh;
+            padding:2vh 6vw;
             border:none;
             border-radius:1vw;
             background:rgba(255,255,255,0.25);
@@ -61,7 +66,10 @@
             bottom:2%;
             left:50%;
             transform:translateX(-50%);
+            display:flex;
+            gap:1vw;
         }
+
         .reset-container button {
             font-size:3vh;
             padding:1vh 3vw;
@@ -69,12 +77,15 @@
             color:white;
             border:none;
             border-radius:1vw;
+            cursor:pointer;
         }
+
+        #flip { background:#4caf50; } /* green for flip */
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="container" id="mainContainer">
     <div class="team teamA" id="containerA">
         <div class="top-button">
             <button class="sub-button" id="subA">-1</button>
@@ -90,6 +101,7 @@
 </div>
 
 <div class="reset-container">
+    <button id="flip">Flip Sides</button>
     <button id="reset">Reset</button>
 </div>
 
@@ -98,7 +110,7 @@
 
     const supabaseUrl = 'https://ygwqbzdhlpvhpuueyyov.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3FiemRobHB2aHB1dWV5eW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzOTQ2NDUsImV4cCI6MjA3Njk3MDY0NX0._N7Pe1ugrzj83SNl4hUlqqIYQeN5Xed2G9SWftVw8-s';
-  
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const gameId = 'volleyball-game-1';
@@ -106,13 +118,13 @@
 
     const elA = document.getElementById('scoreA');
     const elB = document.getElementById('scoreB');
+    const container = document.getElementById('mainContainer');
 
     function updateDisplay() {
         elA.innerText = scoreA;
         elB.innerText = scoreB;
     }
 
-    // Fetch initial scores
     async function getScores() {
         const { data, error } = await supabase.from('games').select('*').eq('id', gameId).single();
         if (error) { console.error('Error fetching scores:', error); return; }
@@ -123,13 +135,11 @@
         }
     }
 
-    // Update scores in Supabase
     async function setScores() {
         const { error } = await supabase.from('games').update({ scorea: scoreA, scoreb: scoreB }).eq('id', gameId);
         if (error) console.error('Error updating scores:', error);
     }
 
-    // Realtime subscription
     supabase.channel('public:games')
         .on('postgres_changes', { event:'*', schema:'public', table:'games', filter:`id=eq.${gameId}` }, (payload) => {
             const newData = payload.new;
@@ -139,7 +149,6 @@
         })
         .subscribe();
 
-    // Add and subtract functions
     const add = async (team) => {
         if (team==='A') scoreA++;
         else scoreB++;
@@ -154,7 +163,6 @@
         await setScores();
     };
 
-    // Reset scores
     const resetScores = async () => {
         if (confirm('Reset both scores?')) {
             scoreA=0; scoreB=0;
@@ -163,16 +171,18 @@
         }
     };
 
-    // Attach button listeners with stopPropagation
     document.getElementById('subA').onclick = (e)=>{ e.stopPropagation(); subtract('A'); };
     document.getElementById('subB').onclick = (e)=>{ e.stopPropagation(); subtract('B'); };
     document.getElementById('reset').onclick = () => resetScores();
 
-    // Container click increments score
     document.getElementById('containerA').onclick = () => add('A');
     document.getElementById('containerB').onclick = () => add('B');
 
-    // Adjust font size dynamically
+    // 🔄 Flip sides visually (no DB change)
+    document.getElementById('flip').onclick = () => {
+        container.classList.toggle('flipped');
+    };
+
     function adjustFontSize(el) {
         const parent = el.parentElement;
         let fontSize = window.innerHeight * 0.8;
