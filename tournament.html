@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volleyball Scoreboard</title>
+    <style>
+        html, body { margin:0; padding:0; height:100%; font-family:Arial,sans-serif; background:black; color:white; overflow:hidden; }
+        .container { display:flex; height:60vh; transition: all 0.5s ease; }
+        .team { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; position:relative; cursor:pointer; }
+        .score { font-size:20vh; font-weight:900; text-align:center; user-select:none; }
+        .team-name { font-size:5vh; font-weight:bold; margin-bottom:1vh; }
+        .top-button { width:100%; display:flex; justify-content:center; position:absolute; top:2%; z-index:10; }
+        .sub-button { font-size:6vh; padding:1vh 3vw; border:none; border-radius:1vw; background:rgba(255,255,255,0.25); color:white; cursor:pointer; }
+        .sub-button:hover { background:rgba(255,255,255,0.5); }
+        .reset-container { position:absolute; bottom:12%; left:50%; transform:translateX(-50%); display:flex; gap:1vw; }
+        .reset-container button { font-size:3vh; padding:1vh 3vw; background:#ff9800; color:white; border:none; border-radius:1vw; cursor:pointer; }
+        #flip { background:#4caf50; }
+        .match-selector { position:absolute; top:2%; left:2%; z-index:20; background:#333; padding:0.5vw 1vw; border-radius:1vw; }
+        .collapsible { position:absolute; bottom:2%; left:50%; transform:translateX(-50%); background:#222; padding:1vw; max-height:40vh; overflow:auto; border-radius:1vw; width:90%; }
+        .collapsible h3 { margin:0 0 1vh 0; font-size:3vh; cursor:pointer; }
+        .collapsible.collapsed .content { display:none; }
+        table { width:100%; border-collapse:collapse; color:white; margin-top:1vh; }
+        th, td { border:1px solid white; padding:0.5vh; text-align:center; }
+        th { background:rgba(255,255,255,0.1); }
+        .toast { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#333; padding:1vw 2vw; border-radius:1vw; display:none; z-index:50; font-size:3vh; }
+    </style>
+</head>
+<body>
+
+<!-- Match selection -->
+<div class="match-selector">
+    <select id="matchSelect"></select>
+    <button id="newMatchBtn">New Match</button>
+</div>
+
+<!-- Scoreboard -->
+<div class="container" id="mainContainer">
+    <div class="team" id="containerA">
+        <div class="team-name" id="teamAName">Team A</div>
+        <div class="top-button">
+            <button class="sub-button" id="subA">-1</button>
+        </div>
+        <div id="scoreA" class="score">0</div>
+    </div>
+    <div class="team" id="containerB">
+        <div class="team-name" id="teamBName">Team B</div>
+        <div class="top-button">
+            <button class="sub-button" id="subB">-1</button>
+        </div>
+        <div id="scoreB" class="score">0</div>
+    </div>
+</div>
+
+<!-- Controls -->
+<div class="reset-container">
+    <button id="flip">Flip Sides</button>
+    <button id="startMatch">Start Match</button>
+    <button id="endMatch">End Match</button>
+    <button id="reset">Reset Scores</button>
+</div>
+
+<!-- Tournament Roster -->
+<div class="collapsible collapsed" id="tournamentRoster">
+    <h3 id="rosterToggle">Full Tournament Roster (8 Matches) ▼</h3>
+    <div class="content">
+        <table>
+            <thead>
+            <tr>
+                <th>Match</th>
+                <th>Teams</th>
+                <th>Court</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr><td>1</td><td>STT vs GIT</td><td>1</td></tr>
+            <tr><td>2</td><td>BD vs KK</td><td>2</td></tr>
+            <tr><td>3</td><td>STT vs BD</td><td>1</td></tr>
+            <tr><td>4</td><td>GIT vs KK</td><td>2</td></tr>
+            <tr><td>5</td><td>STT vs KK</td><td>1</td></tr>
+            <tr><td>6</td><td>GIT vs BD</td><td>2</td></tr>
+            <tr><td>7</td><td>Top 2 Teams (Final)</td><td>1</td></tr>
+            <tr><td>8</td><td>Bottom 2 Teams (3rd place)</td><td>2</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const supabaseUrl = 'https://ygwqbzdhlpvhpuueyyov.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3FiemRobHB2aHB1dWV5eW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzOTQ2NDUsImV4cCI6MjA3Njk3MDY0NX0._N7Pe1ugrzj83SNl4hUlqqIYQeN5Xed2G9SWftVw8-s';
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const teams = {
+        STT: { name:'Save The Tigers', color:'#fbc02d' },
+        GIT: { name:'God Is There', color:'#1976d2' },
+        BD:  { name:'Button Dabavo', color:'#d32f2f' },
+        KK:  { name:'Kattadi Karo', color:'#388e3c' }
+    };
+
+    let currentMatchId = null;
+    let scoreA = 0, scoreB = 0;
+    let matchStatus = 'created';
+
+    const elA = document.getElementById('scoreA');
+    const elB = document.getElementById('scoreB');
+    const containerA = document.getElementById('containerA');
+    const containerB = document.getElementById('containerB');
+    const teamANameEl = document.getElementById('teamAName');
+    const teamBNameEl = document.getElementById('teamBName');
+    const matchSelect = document.getElementById('matchSelect');
+    const startBtn = document.getElementById('startMatch');
+    const endBtn = document.getElementById('endMatch');
+    const resetBtn = document.getElementById('reset');
+    const subA = document.getElementById('subA');
+    const subB = document.getElementById('subB');
+    const mainContainer = document.getElementById('mainContainer');
+    const toast = document.getElementById('toast');
+
+    function showToast(msg){
+        toast.innerText = msg;
+        toast.style.display = 'block';
+        setTimeout(()=>{ toast.style.display = 'none'; },1500);
+    }
+
+    function updateDisplay() {
+        elA.innerText = scoreA;
+        elB.innerText = scoreB;
+    }
+
+    function updateControls() {
+        const disabled = matchStatus === 'finished';
+        subA.disabled = disabled;
+        subB.disabled = disabled;
+        startBtn.disabled = disabled;
+        endBtn.disabled = disabled;
+        resetBtn.disabled = disabled;
+        containerA.style.pointerEvents = disabled ? 'none' : 'auto';
+        containerB.style.pointerEvents = disabled ? 'none' : 'auto';
+    }
+
+    async function loadMatches() {
+        const { data } = await supabase.from('matches').select('*').order('created_at', { ascending:false });
+        matchSelect.innerHTML = '';
+        data.forEach(match => {
+            const opt = document.createElement('option');
+            opt.value = match.id;
+            opt.innerText = `${match.team_a} vs ${match.team_b} (${match.status})`;
+            matchSelect.appendChild(opt);
+        });
+        if(data.length>0) { currentMatchId = data[0].id; await loadCurrentMatch(); }
+    }
+
+    async function loadCurrentMatch() {
+        if(!currentMatchId) return;
+        const { data } = await supabase.from('matches').select('*').eq('id', currentMatchId).single();
+        if(data){
+            scoreA = data.score_a;
+            scoreB = data.score_b;
+            matchStatus = data.status;
+            const teamAInfo = teams[data.team_a] || {name:data.team_a, color:'#555'};
+            const teamBInfo = teams[data.team_b] || {name:data.team_b, color:'#555'};
+            teamANameEl.innerText = `${teamAInfo.name} (${data.team_a})`;
+            teamBNameEl.innerText = `${teamBInfo.name} (${data.team_b})`;
+            containerA.style.background = teamAInfo.color;
+            containerB.style.background = teamBInfo.color;
+            updateDisplay();
+            updateControls();
+        }
+    }
+
+    async function createMatch() {
+        const team_a = prompt('Enter Team A code (STT/GIT/BD/KK):');
+        const team_b = prompt('Enter Team B code (STT/GIT/BD/KK):');
+        const id = crypto.randomUUID();
+        await supabase.from('matches').insert([{ id, team_a, team_b, score_a:0, score_b:0, status:'created' }]);
+        await loadMatches();
+        matchSelect.value = id;
+        currentMatchId = id;
+        await loadCurrentMatch();
+    }
+
+    async function setScores() {
+        if(!currentMatchId) return;
+        await supabase.from('matches').update({ score_a:scoreA, score_b:scoreB }).eq('id', currentMatchId);
+    }
+
+    async function startMatch() {
+        if(!currentMatchId) return;
+        await supabase.from('matches').update({ status:'running', start_time:new Date().toISOString(), score_a:0, score_b:0 }).eq('id', currentMatchId);
+        await loadCurrentMatch();
+        showToast('Match Started!');
+    }
+
+    async function endMatch() {
+        if(!currentMatchId) return;
+        let winner = null;
+        if(scoreA>scoreB) winner = matchSelect.options[matchSelect.selectedIndex].text.split(' vs ')[0].split(' (')[1];
+        else if(scoreB>scoreA) winner = matchSelect.options[matchSelect.selectedIndex].text.split(' vs ')[1].split(' (')[0];
+        await supabase.from('matches').update({ status:'finished', end_time:new Date().toISOString(), winner }).eq('id', currentMatchId);
+        await loadCurrentMatch();
+        showToast('Match Ended!');
+    }
+
+    // Event handlers
+    subA.onclick = e=>{ e.stopPropagation(); if(scoreA>0 && matchStatus!=='finished'){ scoreA--; updateDisplay(); setScores(); } };
+    subB.onclick = e=>{ e.stopPropagation(); if(scoreB>0 && matchStatus!=='finished'){ scoreB--; updateDisplay(); setScores(); } };
+    containerA.onclick = () => { if(matchStatus!=='finished'){ scoreA++; updateDisplay(); setScores(); } };
+    containerB.onclick = () => { if(matchStatus!=='finished'){ scoreB++; updateDisplay(); setScores(); } };
+    resetBtn.onclick = async () => { if(matchStatus!=='finished' && confirm('Reset scores?')) { scoreA=0; scoreB=0; updateDisplay(); setScores(); } };
+    startBtn.onclick = startMatch;
+    endBtn.onclick = endMatch;
+    document.getElementById('newMatchBtn').onclick = createMatch;
+    matchSelect.onchange = async ()=>{ currentMatchId = matchSelect.value; await loadCurrentMatch(); };
+
+    // Flip sides visually
+    document.getElementById('flip').onclick = () => {
+        mainContainer.classList.toggle('flipped');
+        // Swap the team names and scores visually
+        [teamANameEl.innerText, teamBNameEl.innerText] = [teamBNameEl.innerText, teamANameEl.innerText];
+        [scoreA, scoreB] = [scoreB, scoreA];
+        updateDisplay();
+        [containerA.style.background, containerB.style.background] = [containerB.style.background, containerA.style.background];
+    };
+
+    // Collapsible roster
+    const rosterToggle = document.getElementById('rosterToggle');
+    const tournamentRoster = document.getElementById('tournamentRoster');
+    rosterToggle.onclick = () => tournamentRoster.classList.toggle('collapsed');
+
+    // Initial load
+    loadMatches();
+</script>
+</body>
+</html>
