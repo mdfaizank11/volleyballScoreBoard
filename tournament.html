@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Volleyball Scoreboard — Full</title>
+    <title>Volleyball Scoreboard — Fixed Collapsible</title>
     <style>
         :root{
             --bg:#0b0b0b; --fg:#fff;
@@ -12,7 +12,7 @@
             --muted: rgba(255,255,255,0.6);
         }
         html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:Inter,Arial,Helvetica,sans-serif}
-        .wrap{padding:12px;display:flex;flex-direction:column;gap:12px;height:100%}
+        .wrap{padding:12px;display:flex;flex-direction:column;gap:12px;min-height:100vh;box-sizing:border-box}
         .topbar{display:flex;gap:8px;align-items:center}
         select,button{font-size:1rem;padding:8px 10px;border-radius:8px;border:0;cursor:pointer}
         select{background:var(--panel);color:var(--fg)}
@@ -26,11 +26,42 @@
         .controls{display:flex;gap:8px;align-items:center}
         .panel{padding:10px;border-radius:10px;background:var(--panel);display:flex;flex-direction:column;gap:8px}
         .small{padding:6px 8px;font-size:0.9rem;border-radius:6px}
-        .resetRow{display:flex;gap:8px;align-items:center}
         .muted{color:var(--muted)}
-        /* bottom collapsible area */
-        .bottomArea{position:fixed;left:0;right:0;bottom:0;background:#071017;border-top:1px solid rgba(255,255,255,0.04);color:var(--fg)}
-        .collHeader{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;cursor:pointer}
+        /* ------------ bottom area + fixed controls ------------ */
+        /* Height of the fixed controls bar (keep in sync with JS const FIXED_CONTROLS_HEIGHT) */
+        .fixedControls {
+            --height:56px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: var(--height);
+            background: #071017;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            border-top: 1px solid rgba(255,255,255,0.04);
+            z-index: 1000;
+            box-sizing: border-box;
+            align-items: center;
+        }
+        /* place bottomArea *above* the fixed controls (so headers and content are not hidden) */
+        .bottomArea{
+            position: fixed;
+            left:0;
+            right:0;
+            /* leave room for fixed controls */
+            bottom: calc(var(--fixed-controls-offset, 56px));
+            background:#071017;
+            border-top:1px solid rgba(255,255,255,0.04);
+            color:var(--fg);
+            z-index: 800;
+            box-sizing: border-box;
+            padding-bottom: 12px; /* extra breathing room for expanded content */
+        }
+        /* collapsible */
+        .collHeader{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;cursor:pointer; user-select:none}
         .collContent{padding:12px;max-height:42vh;overflow:auto}
         table{width:100%;border-collapse:collapse;color:var(--fg)}
         th,td{padding:8px;border:1px solid rgba(255,255,255,0.04);text-align:center}
@@ -40,26 +71,17 @@
         @media(max-width:900px){
             .score{font-size:12vh}
             .board{flex-direction:column}
-            .bottomArea{position:static}
+            /* on small screens make bottomArea static (flows after content) and push content above fixed controls */
+            .bottomArea{position:static; padding-bottom: calc(var(--fixed-controls-offset,56px)); margin-top:12px;}
+            /* ensure the wrap has bottom padding so the last content is scrollable above the fixed controls */
+            .wrap{padding-bottom: calc(var(--fixed-controls-offset,56px) + 12px);}
         }
-        .fixedControls {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #071017; /* matches bottomArea bg */
-            padding: 8px 12px;
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            border-top: 1px solid rgba(255,255,255,0.04);
-            z-index: 1000; /* above other elements */
-        }
-
+        /* small UX helper so header remains clickable if something overlaps */
+        .collHeader{z-index:900}
     </style>
 </head>
 <body>
-<div class="wrap">
+<div class="wrap" id="wrap">
 
     <div class="topbar">
         <div>
@@ -67,9 +89,7 @@
             <select id="matchSelect"></select>
             <button id="newMatchBtn" class="small">New Match</button>
         </div>
-
         <div style="flex:1"></div>
-
         <div class="panel">
             <div style="font-size:0.9rem;color:var(--muted)">Match Status</div>
             <div id="statusLabel" style="font-weight:700">idle</div>
@@ -96,65 +116,65 @@
         </div>
     </div>
 
-    <div class="fixedControls">
-        <button id="flip" class="small">Flip Sides</button>
-        <button id="startMatch" class="primary small">Start Match</button>
-        <button id="endMatch" class="ghost small">End Match</button>
-        <button id="reset" class="small">Reset Scores</button>
-    </div>
-
+    <!-- leave some bottom space so content isn't jammed under fixed controls on wide screens -->
+    <div style="height:12px"></div>
 </div>
 
+<!-- bottom area (will not be covered by fixed controls because bottom is offset) -->
 <div class="bottomArea" id="bottomArea">
-    <!-- Standings -->
     <div class="collHeader" id="standingsHeader">
         <div style="font-weight:700">Tournament Standings</div>
         <div id="standingsToggle" class="muted">▼</div>
     </div>
     <div class="collContent" id="standingsContent" style="display:none">
         <table class="standingsTable">
-            <thead>
-            <tr><th>Team</th><th>Wins</th><th>Losses</th><th>Points Scored</th><th>Points Conceded</th><th>PD</th></tr>
-            </thead>
+            <thead><tr><th>Team</th><th>Wins</th><th>Losses</th><th>Points Scored</th><th>Points Conceded</th><th>PD</th></tr></thead>
             <tbody id="standingsBody"></tbody>
         </table>
     </div>
 
-    <!-- Static Tournament Roster -->
-    <div class="collHeader" style="border-top:1px solid rgba(255,255,255,0.03);">
+    <div class="collHeader" id="rosterHeader" style="border-top:1px solid rgba(255,255,255,0.03);">
         <div style="font-weight:700">Full Tournament Roster (8 Matches)</div>
         <div id="rosterToggle" class="muted">▼</div>
     </div>
     <div class="collContent" id="rosterContent" style="display:block">
         <table class="rosterTable">
             <thead><tr><th>#</th><th>Match</th><th>Court</th><th>Status / Result</th></tr></thead>
-            <tbody id="rosterBody">
-            <!-- rows will be populated by JS -->
-            </tbody>
+            <tbody id="rosterBody"></tbody>
         </table>
     </div>
 </div>
 
+<!-- fixed control bar -->
+<div class="fixedControls" id="fixedControls">
+    <button id="flip" class="small">Flip Sides</button>
+    <button id="startMatch" class="primary small">Start Match</button>
+    <button id="endMatch" class="ghost small">End Match</button>
+    <button id="reset" class="small">Reset Scores</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
-<!-- js -->
 <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-    // ---------- Supabase (user-supplied keys) ----------
+    // ---------- CONFIG ----------
+    const FIXED_CONTROLS_HEIGHT = 56; // keep in sync with CSS --height
+    // set CSS variable so bottomArea can use it
+    document.documentElement.style.setProperty('--fixed-controls-offset', FIXED_CONTROLS_HEIGHT + 'px');
+
     const supabaseUrl = 'https://ygwqbzdhlpvhpuueyyov.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3FiemRobHB2aHB1dWV5eW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzOTQ2NDUsImV4cCI6MjA3Njk3MDY0NX0._N7Pe1ugrzj83SNl4hUlqqIYQeN5Xed2G9SWftVw8-s';
+    const supabaseKey = 'YOUR_SUPABASE_KEY'; // <-- replace
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // ---------- Team definitions ----------
+    // ---------- Teams & roster ----------
     const TEAMS = {
-        STT: { code:'STT', name: 'Save The Tigers', color: '#fbc02d' },
-        GIT: { code:'GIT', name: 'God Is There', color: '#1976d2' },
-        BD:  { code:'BD',  name: 'Button Dabavo', color: '#d32f2f' },
-        KK:  { code:'KK',  name: 'Kattadi Karo', color: '#388e3c' }
+        STT: { code:'STT', name:'Save The Tigers', color:'#fbc02d' },
+        GIT: { code:'GIT', name:'God Is There', color:'#1976d2' },
+        BD:  { code:'BD',  name: 'Button Dabavo', color:'#d32f2f' },
+        KK:  { code:'KK',  name: 'Kattadi Karo', color:'#388e3c' }
     };
 
-    // Static roster list (matches 1..8)
     const TOURNAMENT_ROSTER = [
         { n:1, teams:['STT','GIT'], court:1 },
         { n:2, teams:['BD','KK'], court:2 },
@@ -162,8 +182,8 @@
         { n:4, teams:['GIT','KK'], court:2 },
         { n:5, teams:['STT','KK'], court:1 },
         { n:6, teams:['GIT','BD'], court:2 },
-        { n:7, teams:['TOP2','TOP2'], court:1 }, // placeholders
-        { n:8, teams:['BOT2','BOT2'], court:2 }  // placeholders
+        { n:7, teams:['TOP2','TOP2'], court:1 },
+        { n:8, teams:['BOT2','BOT2'], court:2 }
     ];
 
     // ---------- DOM refs ----------
@@ -185,31 +205,28 @@
     const resetBtn = document.getElementById('reset');
 
     const standingsHeader = document.getElementById('standingsHeader');
-    const standingsToggle = document.getElementById('standingsToggle');
     const standingsContent = document.getElementById('standingsContent');
-    const standingsBody = document.getElementById('standingsBody');
-
-    const rosterToggle = document.getElementById('rosterToggle');
+    const standingsToggle = document.getElementById('standingsToggle');
+    const rosterHeader = document.getElementById('rosterHeader');
     const rosterContent = document.getElementById('rosterContent');
+    const rosterToggle = document.getElementById('rosterToggle');
+    const standingsBody = document.getElementById('standingsBody');
     const rosterBody = document.getElementById('rosterBody');
-
+    const bottomArea = document.getElementById('bottomArea');
+    const fixedControls = document.getElementById('fixedControls');
     const toast = document.getElementById('toast');
 
-    // ---------- State ----------
+    // ---------- state ----------
     let currentMatchId = null;
     let scoreA = 0, scoreB = 0;
-    let currentStatus = 'created'; // created | running | finished
+    let currentStatus = 'created';
 
-    // ---------- Utilities ----------
-    function uid(){ return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-'+Math.random().toString(36).slice(2,12); }
-    function showToast(msg, ms=1500){
-        toast.innerText = msg;
-        toast.style.display = 'block';
-        setTimeout(()=> toast.style.display='none', ms);
-    }
-    function clamp(n, m=0){ return n < m ? m : n; }
+    // ---------- helpers ----------
+    const uid = ()=> crypto.randomUUID?.() || 'id-'+Math.random().toString(36).slice(2,12);
+    const showToast = (m,ms=1400)=>{ toast.innerText=m; toast.style.display='block'; setTimeout(()=> toast.style.display='none', ms); };
+    const clamp = (n,m=0)=> n < m ? m : n;
 
-    // ---------- RENDER helpers ----------
+    // render team UI
     function renderTeamUI(teamCodeA, teamCodeB){
         const aInfo = TEAMS[teamCodeA] ?? { code:teamCodeA, name:teamCodeA, color:'#666' };
         const bInfo = TEAMS[teamCodeB] ?? { code:teamCodeB, name:teamCodeB, color:'#666' };
@@ -219,195 +236,9 @@
         sideB.style.background = bInfo.color;
     }
 
-    function updateScoreDisplay(){
-        scoreAEl.innerText = String(scoreA);
-        scoreBEl.innerText = String(scoreB);
-    }
+    function updateScoreDisplay(){ scoreAEl.innerText = String(scoreA); scoreBEl.innerText = String(scoreB); }
 
-    function setControlsEnabled(enabled){
-        // If enabled = false => disable controls (match finished)
-        subA.disabled = subB.disabled = !enabled;
-        flipBtn.disabled = !enabled;
-        startBtn.disabled = !enabled;
-        endBtn.disabled = !enabled;
-        resetBtn.disabled = !enabled;
-        // disable panel taps by pointer-events
-        sideA.style.pointerEvents = enabled ? 'auto' : 'none';
-        sideB.style.pointerEvents = enabled ? 'auto' : 'none';
-    }
-
-    // ---------- DB-safe update (guard against updating finished match) ----------
-    async function safeUpdateScoresInDb(matchId, a, b){
-        if(!matchId) return;
-        // fetch status before updating
-        const { data:row, error:err1 } = await supabase.from('matches').select('status').eq('id', matchId).single();
-        if(err1){
-            console.error('status fetch error', err1);
-            return;
-        }
-        if(!row) return;
-        if(row.status === 'finished'){
-            // match already finished — reload UI
-            showToast('Match already finished — no changes allowed', 1800);
-            await loadCurrentMatch(); // refresh UI
-            return;
-        }
-        const { error } = await supabase.from('matches').update({ score_a: a, score_b: b }).eq('id', matchId);
-        if(error) console.error('update scores error', error);
-    }
-
-    // ---------- Load matches list ----------
-    async function loadMatches(){
-        const { data, error } = await supabase.from('matches').select('*').order('created_at',{ascending:false});
-        if(error){ console.error(error); return; }
-        matchSelect.innerHTML = '';
-        data.forEach(m=>{
-            const opt = document.createElement('option');
-            opt.value = m.id;
-            opt.text = `${m.team_a} vs ${m.team_b} (${m.status})`;
-            matchSelect.appendChild(opt);
-        });
-        if(data.length > 0){
-            currentMatchId = data[0].id;
-            matchSelect.value = currentMatchId;
-            await loadCurrentMatch();
-        } else {
-            // no matches yet: create placeholder UI
-            currentMatchId = null;
-            teamAName.innerText = '—';
-            teamBName.innerText = '—';
-            scoreA = scoreB = 0;
-            updateScoreDisplay();
-            statusLabel.innerText = 'idle';
-            setControlsEnabled(false);
-        }
-    }
-
-    // ---------- Load selected/current match ----------
-    async function loadCurrentMatch(){
-        if(!currentMatchId) return;
-        const { data, error } = await supabase.from('matches').select('*').eq('id', currentMatchId).single();
-        if(error){ console.error('loadCurrentMatch error', error); return; }
-        // update UI
-        scoreA = data.score_a || 0;
-        scoreB = data.score_b || 0;
-        currentStatus = data.status || 'created';
-        renderTeamUI(data.team_a, data.team_b);
-        updateScoreDisplay();
-        statusLabel.innerText = currentStatus;
-        setControlsEnabled(currentStatus !== 'finished');
-    }
-
-    // ---------- Start Match (sets status running & resets scores) ----------
-    async function startMatch(){
-        if(!currentMatchId) { showToast('No match selected'); return; }
-        // server update: set running + reset scores
-        const { error } = await supabase.from('matches').update({ status:'running', start_time: new Date().toISOString(), score_a:0, score_b:0 }).eq('id', currentMatchId);
-        if(error){ console.error('startMatch error', error); showToast('Error starting'); return; }
-        scoreA = 0; scoreB = 0;
-        currentStatus = 'running';
-        statusLabel.innerText = currentStatus;
-        setControlsEnabled(true);
-        updateScoreDisplay();
-        showToast('Match Started');
-    }
-
-    // ---------- End Match (mark finished, set winner) ----------
-    async function endMatch(){
-        if(!currentMatchId) { showToast('No match selected'); return; }
-        // mark finished and set winner code (team short code)
-        // determine winner by comparing current scoreA/scoreB
-        let winnerCode = null;
-        // find team codes from UI (teamAName text starts with CODE — Name)
-        const aCode = teamAName.innerText.split(' — ')[0]?.trim();
-        const bCode = teamBName.innerText.split(' — ')[0]?.trim();
-        if(scoreA > scoreB) winnerCode = aCode;
-        else if(scoreB > scoreA) winnerCode = bCode;
-        // update DB: set final scores, end_time, status, winner
-        const { error } = await supabase.from('matches').update({ status:'finished', end_time: new Date().toISOString(), score_a:scoreA, score_b:scoreB, winner: winnerCode }).eq('id', currentMatchId);
-        if(error){ console.error('endMatch error', error); showToast('Error ending'); return; }
-        currentStatus = 'finished';
-        statusLabel.innerText = currentStatus;
-        setControlsEnabled(false);
-        showToast('Match Ended');
-        // recalc standings & update roster display
-        await calculateStandings();
-        await refreshRosterDisplay();
-    }
-
-    // ---------- Update score (user tapped panels) ----------
-    async function localIncrement(team){
-        if(currentStatus === 'finished'){ showToast('Match finished — no changes'); return; }
-        if(team==='A') scoreA++;
-        else scoreB++;
-        updateScoreDisplay();
-        await safeUpdateScoresInDb(currentMatchId, scoreA, scoreB);
-    }
-    async function localDecrement(team){
-        if(currentStatus === 'finished'){ showToast('Match finished — no changes'); return; }
-        if(team==='A') scoreA = clamp(scoreA-1,0);
-        else scoreB = clamp(scoreB-1,0);
-        updateScoreDisplay();
-        await safeUpdateScoresInDb(currentMatchId, scoreA, scoreB);
-    }
-
-    // ---------- Reset scores (only if not finished) ----------
-    async function resetScores(){
-        if(currentStatus === 'finished'){ showToast('Match finished — no changes'); return; }
-        if(!confirm('Reset both scores?')) return;
-        scoreA = 0; scoreB = 0;
-        updateScoreDisplay();
-        await safeUpdateScoresInDb(currentMatchId, scoreA, scoreB);
-    }
-
-    // ---------- Calculate standings based on finished matches ----------
-    async function calculateStandings(){
-        const { data: finishedMatches, error } = await supabase.from('matches').select('*').eq('status','finished');
-        if(error){ console.error('standings fetch error', error); return; }
-        // initialize stats for each team
-        const stats = {};
-        Object.keys(TEAMS).forEach(code => { stats[code] = { wins:0, losses:0, scored:0, conceded:0, pd:0 }; });
-
-        // accumulate
-        finishedMatches.forEach(m=>{
-            const a = m.team_a, b = m.team_b;
-            const sa = Number(m.score_a || 0), sb = Number(m.score_b || 0);
-            if(!stats[a]) stats[a] = { wins:0, losses:0, scored:0, conceded:0, pd:0 };
-            if(!stats[b]) stats[b] = { wins:0, losses:0, scored:0, conceded:0, pd:0 };
-            stats[a].scored += sa; stats[a].conceded += sb;
-            stats[b].scored += sb; stats[b].conceded += sa;
-            if(sa > sb){ stats[a].wins++; stats[b].losses++; }
-            else if(sb > sa){ stats[b].wins++; stats[a].losses++; }
-        });
-
-        Object.keys(stats).forEach(k => stats[k].pd = stats[k].scored - stats[k].conceded);
-
-        // rank: wins desc, PD desc
-        const ranked = Object.entries(stats).sort(([,A], [,B])=>{
-            if(A.wins !== B.wins) return B.wins - A.wins;
-            return B.pd - A.pd;
-        });
-
-        // render
-        standingsBody.innerHTML = '';
-        ranked.forEach(([code, s])=>{
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-        <td style="color:${TEAMS[code]?.color || '#fff'}">${code} (${TEAMS[code]?.name ?? code})</td>
-        <td>${s.wins}</td>
-        <td>${s.losses}</td>
-        <td>${s.scored}</td>
-        <td>${s.conceded}</td>
-        <td>${s.pd}</td>
-      `;
-            standingsBody.appendChild(tr);
-        });
-
-        // return ranked list (useful for finals mapping)
-        return ranked.map(([code]) => code);
-    }
-
-    // ---------- Roster display: static schedule, show results if finished ----------
+    // populate roster table
     function buildRosterRows(){
         rosterBody.innerHTML = '';
         TOURNAMENT_ROSTER.forEach(row=>{
@@ -419,10 +250,40 @@
         });
     }
 
+    // calculate standings
+    async function calculateStandings(){
+        const { data: finishedMatches, error } = await supabase.from('matches').select('*').eq('status','finished');
+        if(error){ console.error('standings fetch error', error); return []; }
+        const stats = {};
+        Object.keys(TEAMS).forEach(code => { stats[code] = { wins:0, losses:0, scored:0, conceded:0, pd:0 }; });
+        finishedMatches.forEach(m=>{
+            const a = m.team_a, b = m.team_b;
+            const sa = Number(m.score_a || 0), sb = Number(m.score_b || 0);
+            if(!stats[a]) stats[a] = { wins:0, losses:0, scored:0, conceded:0, pd:0 };
+            if(!stats[b]) stats[b] = { wins:0, losses:0, scored:0, conceded:0, pd:0 };
+            stats[a].scored += sa; stats[a].conceded += sb;
+            stats[b].scored += sb; stats[b].conceded += sa;
+            if(sa > sb){ stats[a].wins++; stats[b].losses++; }
+            else if(sb > sa){ stats[b].wins++; stats[a].losses++; }
+        });
+        Object.keys(stats).forEach(k => stats[k].pd = stats[k].scored - stats[k].conceded);
+        const ranked = Object.entries(stats).sort(([,A], [,B])=>{
+            if(A.wins !== B.wins) return B.wins - A.wins;
+            return B.pd - A.pd;
+        });
+        // render table
+        standingsBody.innerHTML = '';
+        ranked.forEach(([code, s])=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td style="color:${TEAMS[code]?.color || '#fff'}">${code} (${TEAMS[code]?.name ?? code})</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.scored}</td><td>${s.conceded}</td><td>${s.pd}</td>`;
+            standingsBody.appendChild(tr);
+        });
+        return ranked.map(([code]) => code);
+    }
+
+    // refresh roster rows with finished match results
     async function refreshRosterDisplay(){
-        // mark rows 1..6 by searching for finished matches with those teams (either order)
         const { data: finishedMatches } = await supabase.from('matches').select('*').eq('status','finished');
-        // helper to find finished match by team pair
         function findMatchForPair(a,b){
             return finishedMatches.find(m => (m.team_a === a && m.team_b === b) || (m.team_a === b && m.team_b === a));
         }
@@ -433,7 +294,6 @@
                 const [a,b] = row.teams;
                 const match = findMatchForPair(a,b);
                 if(match){
-                    // show "STT 21 - 18 GIT" style with winner highlighted
                     const aScore = Number(match.score_a || 0);
                     const bScore = Number(match.score_b || 0);
                     const display = `${match.team_a} ${aScore} - ${bScore} ${match.team_b}`;
@@ -442,7 +302,7 @@
                     statusCell.innerText = 'Pending';
                 }
             } else if(row.n === 7){
-                const ranked = await calculateStandings(); // returns array of codes
+                const ranked = await calculateStandings();
                 if(ranked.length >= 2){
                     statusCell.innerText = `${ranked[0]} vs ${ranked[1]} (Final)`;
                     const match = finishedMatches.find(m => (m.team_a === ranked[0] && m.team_b === ranked[1]) || (m.team_a === ranked[1] && m.team_b === ranked[0]));
@@ -464,11 +324,106 @@
         }
     }
 
-    // ---------- Realtime subscription ----------
+    // safe DB update guard
+    async function safeUpdateScoresInDb(matchId, a, b){
+        if(!matchId) return;
+        const { data:row, error:err1 } = await supabase.from('matches').select('status').eq('id', matchId).single();
+        if(err1){ console.error('status fetch error', err1); return; }
+        if(!row) return;
+        if(row.status === 'finished'){
+            showToast('Match already finished — no changes allowed', 1800);
+            await loadCurrentMatch();
+            return;
+        }
+        const { error } = await supabase.from('matches').update({ score_a: a, score_b: b }).eq('id', matchId);
+        if(error) console.error('update scores error', error);
+    }
+
+    // load matches list
+    async function loadMatches(){
+        const { data, error } = await supabase.from('matches').select('*').order('created_at',{ascending:false});
+        if(error){ console.error(error); return; }
+        matchSelect.innerHTML = '';
+        data.forEach(m=>{
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.text = `${m.team_a} vs ${m.team_b} (${m.status})`;
+            matchSelect.appendChild(opt);
+        });
+        if(data.length > 0){
+            currentMatchId = data[0].id;
+            matchSelect.value = currentMatchId;
+            await loadCurrentMatch();
+        } else {
+            currentMatchId = null;
+            teamAName.innerText = '—';
+            teamBName.innerText = '—';
+            scoreA = scoreB = 0; updateScoreDisplay();
+            statusLabel.innerText = 'idle';
+        }
+    }
+
+    // load selected/current match
+    async function loadCurrentMatch(){
+        if(!currentMatchId) return;
+        const { data, error } = await supabase.from('matches').select('*').eq('id', currentMatchId).single();
+        if(error){ console.error('loadCurrentMatch error', error); return; }
+        scoreA = data.score_a || 0; scoreB = data.score_b || 0;
+        currentStatus = data.status || 'created';
+        renderTeamUI(data.team_a, data.team_b);
+        updateScoreDisplay();
+        statusLabel.innerText = currentStatus;
+    }
+
+    // start / end match
+    async function startMatch(){
+        if(!currentMatchId){ showToast('No match selected'); return; }
+        const { error } = await supabase.from('matches').update({ status:'running', start_time: new Date().toISOString(), score_a:0, score_b:0 }).eq('id', currentMatchId);
+        if(error){ console.error('startMatch error', error); showToast('Error starting'); return; }
+        scoreA = 0; scoreB = 0; currentStatus = 'running';
+        statusLabel.innerText = currentStatus; updateScoreDisplay(); showToast('Match Started');
+    }
+
+    async function endMatch(){
+        if(!currentMatchId){ showToast('No match selected'); return; }
+        if(!confirm('End match and lock scores?')) return;
+        let winnerCode = null;
+        const aCode = teamAName.innerText.split(' — ')[0]?.trim();
+        const bCode = teamBName.innerText.split(' — ')[0]?.trim();
+        if(scoreA > scoreB) winnerCode = aCode;
+        else if(scoreB > scoreA) winnerCode = bCode;
+        const { error } = await supabase.from('matches').update({ status:'finished', end_time: new Date().toISOString(), score_a:scoreA, score_b:scoreB, winner: winnerCode }).eq('id', currentMatchId);
+        if(error){ console.error('endMatch error', error); showToast('Error ending'); return; }
+        currentStatus = 'finished'; statusLabel.innerText = currentStatus; showToast('Match Ended');
+        await calculateStandings();
+        await refreshRosterDisplay();
+    }
+
+    // local increment/decrement
+    async function localIncrement(team){
+        if(currentStatus === 'finished'){ showToast('Match finished — no changes'); return; }
+        if(team==='A') scoreA++; else scoreB++;
+        updateScoreDisplay();
+        await safeUpdateScoresInDb(currentMatchId, scoreA, scoreB);
+    }
+    async function localDecrement(team){
+        if(currentStatus === 'finished'){ showToast('Match finished — no changes'); return; }
+        if(team==='A') scoreA = clamp(scoreA-1,0); else scoreB = clamp(scoreB-1,0);
+        updateScoreDisplay();
+        await safeUpdateScoresInDb(currentMatchId, scoreA, scoreB);
+    }
+
+    async function resetScores(){
+        if(currentStatus === 'finished'){ showToast('Match finished — no changes'); return; }
+        if(!confirm('Reset both scores?')) return;
+        scoreA = 0; scoreB = 0; updateScoreDisplay();
+        await safeUpdateScoresInDb(currentMatchId, scoreA, scoreB);
+    }
+
+    // realtime subscription: update UI when matches change
     supabase.channel('public:matches')
         .on('postgres_changes', { event:'*', schema:'public', table:'matches' }, async payload => {
             const changed = payload.new;
-            // If the changed match is the current one, reflect the live score
             if(changed && currentMatchId && changed.id === currentMatchId){
                 scoreA = Number(changed.score_a || 0);
                 scoreB = Number(changed.score_b || 0);
@@ -476,16 +431,13 @@
                 statusLabel.innerText = currentStatus;
                 renderTeamUI(changed.team_a, changed.team_b);
                 updateScoreDisplay();
-                setControlsEnabled(currentStatus !== 'finished');
             }
-            // Always recalc standings and update roster rows when any match changes
             await calculateStandings();
             await refreshRosterDisplay();
         })
         .subscribe();
 
-    // ---------- Event wiring ----------
-    // Panel taps to add 1
+    // ---------- UI events ----------
     sideA.addEventListener('click', async (e) => {
         if(e.target === subA) return;
         if(!currentMatchId){ showToast('Select or create a match'); return; }
@@ -501,39 +453,23 @@
         await safeUpdateScoresInDb(currentMatchId, scoreA, scoreB);
     });
 
-    // Subtract buttons
     subA.addEventListener('click', async (e)=>{ e.stopPropagation(); if(!currentMatchId) return; if(currentStatus === 'finished'){ showToast('Match finished — no changes'); return; } scoreA = clamp(scoreA-1,0); updateScoreDisplay(); await safeUpdateScoresInDb(currentMatchId, scoreA, scoreB); });
     subB.addEventListener('click', async (e)=>{ e.stopPropagation(); if(!currentMatchId) return; if(currentStatus === 'finished'){ showToast('Match finished — no changes'); return; } scoreB = clamp(scoreB-1,0); updateScoreDisplay(); await safeUpdateScoresInDb(currentMatchId, scoreA, scoreB); });
 
-    // Flip (visual only) — disabled after finish by setControlsEnabled
     flipBtn.addEventListener('click', ()=>{
-        // swap visuals
         const aName = teamAName.innerText, bName = teamBName.innerText;
         const aBg = sideA.style.background, bBg = sideB.style.background;
         teamAName.innerText = bName; teamBName.innerText = aName;
         sideA.style.background = bBg; sideB.style.background = aBg;
-        // swap scores too so the big scoreboard still matches teams
         [scoreA, scoreB] = [scoreB, scoreA];
         updateScoreDisplay();
     });
 
-    // Start / End / Reset
-    startBtn.addEventListener('click', async ()=>{
-        if(!currentMatchId){ showToast('Select or create a match'); return; }
-        await startMatch();
-    });
-    endBtn.addEventListener('click', async ()=>{
-        if(!currentMatchId){ showToast('Select or create a match'); return; }
-        if(!confirm('End match and lock scores?')) return;
-        await endMatch();
-    });
-    resetBtn.addEventListener('click', async ()=>{
-        await resetScores();
-    });
+    startBtn.addEventListener('click', async ()=>{ if(!currentMatchId){ showToast('Select or create a match'); return; } await startMatch(); });
+    endBtn.addEventListener('click', async ()=>{ if(!currentMatchId){ showToast('Select or create a match'); return; } if(!confirm('End match and lock scores?')) return; await endMatch(); });
+    resetBtn.addEventListener('click', async ()=>{ await resetScores(); });
 
-    // New match button
     newMatchBtn.addEventListener('click', async ()=>{
-        // prompt for team codes (simple)
         const team_a = prompt('Enter Team A code (STT/GIT/BD/KK):');
         if(!team_a) return;
         const team_b = prompt('Enter Team B code (STT/GIT/BD/KK):');
@@ -543,38 +479,50 @@
         const { error } = await supabase.from('matches').insert(payload);
         if(error){ console.error('create match error', error); showToast('Error creating match'); return; }
         await loadMatches();
-        matchSelect.value = id;
-        currentMatchId = id;
-        await loadCurrentMatch();
+        matchSelect.value = id; currentMatchId = id; await loadCurrentMatch();
         showToast('Match created');
     });
 
-    // Select change
     matchSelect.addEventListener('change', async ()=>{
         currentMatchId = matchSelect.value;
         await loadCurrentMatch();
     });
 
-    // Collapsible toggles
-    standingsHeader.addEventListener('click', ()=> {
-        const vis = standingsContent.style.display === 'block';
-        standingsContent.style.display = vis ? 'none' : 'block';
-        standingsToggle.innerText = vis ? '▼' : '▲';
-    });
-    rosterToggle.addEventListener('click', ()=> {
-        const vis = rosterContent.style.display === 'block';
-        rosterContent.style.display = vis ? 'none' : 'block';
-        rosterToggle.innerText = vis ? '▼' : '▲';
+    // ---------- Collapsible toggles (improved) ----------
+    function openSection(contentEl, toggleEl){
+        contentEl.style.display = 'block';
+        toggleEl.textContent = '▲';
+        // ensure bottom area is visible (smooth)
+        setTimeout(()=> bottomArea.scrollIntoView({ behavior:'smooth', block:'end' }), 50);
+    }
+    function closeSection(contentEl, toggleEl){
+        contentEl.style.display = 'none';
+        toggleEl.textContent = '▼';
+        setTimeout(()=> bottomArea.scrollIntoView({ behavior:'smooth', block:'end' }), 50);
+    }
+
+    standingsHeader.addEventListener('click', ()=>{
+        const isHidden = standingsContent.style.display === 'none';
+        if(isHidden) openSection(standingsContent, standingsToggle); else closeSection(standingsContent, standingsToggle);
     });
 
-    // ---------- Initialization ----------
+    rosterHeader.addEventListener('click', ()=>{
+        const isHidden = rosterContent.style.display === 'none';
+        if(isHidden) openSection(rosterContent, rosterToggle); else closeSection(rosterContent, rosterToggle);
+    });
+
+    // ---------- init ----------
     (async function init(){
         buildRosterRows();
         await loadMatches();
         await calculateStandings();
         await refreshRosterDisplay();
-    })();
 
+        // ensure bottomArea bottom offset matches fixed controls height (JS-side too)
+        // This also helps if you change FIXED_CONTROLS_HEIGHT at top
+        bottomArea.style.bottom = FIXED_CONTROLS_HEIGHT + 'px';
+        // when small screen, we already handle with CSS to make bottomArea static
+    })();
 </script>
 </body>
 </html>
