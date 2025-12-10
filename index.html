@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Volleyball Scoreboard</title>
+
     <style>
         html, body {
             margin:0; padding:0; height:100%; font-family:Arial,sans-serif;
@@ -35,10 +36,10 @@
         .teamB { background:#1565c0; }
 
         .score {
-            font-size:45vh;
             font-weight:900;
             text-align:center;
             user-select:none;
+            line-height:1;
         }
 
         .top-button {
@@ -59,6 +60,7 @@
             color:white;
             cursor:pointer;
         }
+
         .sub-button:hover { background:rgba(255,255,255,0.5); }
 
         .reset-container {
@@ -80,16 +82,10 @@
             cursor:pointer;
         }
 
-    
         #flip {
             font-size:4vh;
             padding:2.5vh 6vw;
-            background:#4caf50; /* green */
-            }
-        #reset {
-            font-size:3.5vh;
-            padding:2vh 5vw;
-            background:#ff9800;
+            background:#4caf50;
         }
     </style>
 </head>
@@ -102,6 +98,7 @@
         </div>
         <div id="scoreA" class="score">0</div>
     </div>
+
     <div class="team teamB" id="containerB">
         <div class="top-button">
             <button class="sub-button" id="subB">-1</button>
@@ -116,30 +113,65 @@
 </div>
 
 <script type="module">
-    //import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
     import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-
     const supabaseUrl = 'https://ygwqbzdhlpvhpuueyyov.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3FiemRobHB2aHB1dWV5eW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzOTQ2NDUsImV4cCI6MjA3Njk3MDY0NX0._N7Pe1ugrzj83SNl4hUlqqIYQeN5Xed2G9SWftVw8-s';
-
+    const supabaseKey = 'YOUR_KEY';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const gameId = 'volleyball-game-1';
-    let scoreA = 0, scoreB = 0;
+    const gameId = "volleyball-game-1";
 
-    const elA = document.getElementById('scoreA');
-    const elB = document.getElementById('scoreB');
-    const container = document.getElementById('mainContainer');
+    let scoreA = 0;
+    let scoreB = 0;
 
+    const elA = document.getElementById("scoreA");
+    const elB = document.getElementById("scoreB");
+    const container = document.getElementById("mainContainer");
+
+    // --------------------------------------------------------
+    //  PERFECT FITTING FONT FUNCTION (Width + Height)
+    // --------------------------------------------------------
+    function resizeScore(el) {
+        let parent = el.parentElement;
+        let size = parent.clientHeight * 0.8;
+        el.style.fontSize = size + "px";
+
+        while (
+            (el.scrollWidth > parent.clientWidth - 40 ||
+                el.scrollHeight > parent.clientHeight - 40) &&
+            size > 10
+            ) {
+            size -= 2;
+            el.style.fontSize = size + "px";
+        }
+    }
+
+    function repaintScores() {
+        resizeScore(elA);
+        resizeScore(elB);
+    }
+
+    window.addEventListener("resize", repaintScores);
+
+    // --------------------------------------------------------
+    //  Display update
+    // --------------------------------------------------------
     function updateDisplay() {
         elA.innerText = scoreA;
         elB.innerText = scoreB;
+        repaintScores();
     }
 
+    // --------------------------------------------------------
+    //  Supabase syncing
+    // --------------------------------------------------------
     async function getScores() {
-        const { data, error } = await supabase.from('games').select('*').eq('id', gameId).single();
-        if (error) { console.error('Error fetching scores:', error); return; }
+        const { data } = await supabase
+            .from("games")
+            .select("*")
+            .eq("id", gameId)
+            .single();
+
         if (data) {
             scoreA = data.scorea;
             scoreB = data.scoreb;
@@ -148,69 +180,54 @@
     }
 
     async function setScores() {
-        const { error } = await supabase.from('games').update({ scorea: scoreA, scoreb: scoreB }).eq('id', gameId);
-        if (error) console.error('Error updating scores:', error);
+        await supabase
+            .from("games")
+            .update({ scorea: scoreA, scoreb: scoreB })
+            .eq("id", gameId);
     }
 
-    supabase.channel('public:games')
-        .on('postgres_changes', { event:'*', schema:'public', table:'games', filter:`id=eq.${gameId}` }, (payload) => {
-            const newData = payload.new;
-            scoreA = newData.scorea;
-            scoreB = newData.scoreb;
-            updateDisplay();
-        })
+    supabase
+        .channel("public:games")
+        .on(
+            "postgres_changes",
+            {
+                event: "*",
+                schema: "public",
+                table: "games",
+                filter: `id=eq.${gameId}`
+            },
+            (payload) => {
+                scoreA = payload.new.scorea;
+                scoreB = payload.new.scoreb;
+                updateDisplay();
+            }
+        )
         .subscribe();
 
-    const add = async (team) => {
-        if (team==='A') scoreA++;
-        else scoreB++;
-        updateDisplay();
-        await setScores();
-    };
+    // --------------------------------------------------------
+    //  Buttons + Interaction
+    // --------------------------------------------------------
+    document.getElementById("containerA").onclick = () => { scoreA++; setScores(); updateDisplay(); };
+    document.getElementById("containerB").onclick = () => { scoreB++; setScores(); updateDisplay(); };
 
-    const subtract = async (team) => {
-        if (team==='A' && scoreA>0) scoreA--;
-        else if (team==='B' && scoreB>0) scoreB--;
-        updateDisplay();
-        await setScores();
-    };
+    document.getElementById("subA").onclick = (e) => { e.stopPropagation(); if(scoreA>0) scoreA--; setScores(); updateDisplay(); };
+    document.getElementById("subB").onclick = (e) => { e.stopPropagation(); if(scoreB>0) scoreB--; setScores(); updateDisplay(); };
 
-    const resetScores = async () => {
-        if (confirm('Reset both scores?')) {
-            scoreA=0; scoreB=0;
+    document.getElementById("reset").onclick = async () => {
+        if (confirm("Reset both scores?")) {
+            scoreA = 0; scoreB = 0;
+            setScores();
             updateDisplay();
-            await setScores();
         }
     };
 
-    document.getElementById('subA').onclick = (e)=>{ e.stopPropagation(); subtract('A'); };
-    document.getElementById('subB').onclick = (e)=>{ e.stopPropagation(); subtract('B'); };
-    document.getElementById('reset').onclick = () => resetScores();
-
-    document.getElementById('containerA').onclick = () => add('A');
-    document.getElementById('containerB').onclick = () => add('B');
-
-    // 🔄 Flip sides visually (no DB change)
-    document.getElementById('flip').onclick = () => {
-        container.classList.toggle('flipped');
+    document.getElementById("flip").onclick = () => {
+        container.classList.toggle("flipped");
     };
 
-    function adjustFontSize(el) {
-        const parent = el.parentElement;
-        let fontSize = window.innerHeight * 0.8;
-        el.style.fontSize = fontSize+'px';
-        while(el.scrollWidth > parent.clientWidth - 40) {
-            fontSize -= 5;
-            el.style.fontSize = fontSize+'px';
-        }
-    }
-
-    window.addEventListener('resize', ()=>{ adjustFontSize(elA); adjustFontSize(elB); });
-
-    adjustFontSize(elA);
-    adjustFontSize(elB);
-
+    // Initial load
     await getScores();
+    repaintScores();
 </script>
 
 </body>
